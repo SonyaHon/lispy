@@ -1,0 +1,5 @@
+(def! empty? (fn* (collection)
+    (= 0 (count collection))))
+
+(def! not (fn* (condition)
+    (if condition false true)))
