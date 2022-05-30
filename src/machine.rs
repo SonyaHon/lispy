@@ -65,111 +65,143 @@ fn eval_ast(expression: &LispyType, env: &mut LispyEnv) -> Result<LispyType, Lis
     }
 }
 
-pub fn eval(expression: &LispyType, env: &mut LispyEnv) -> Result<LispyType, LispyType> {
-    match expression {
-        LispyType::List { .. } => {
-            if expression.as_list().unwrap().is_empty() {
-                return Ok(expression.clone());
-            }
+pub fn eval(passed_expression: &LispyType, passed_env: &mut LispyEnv) -> Result<LispyType, LispyType> {
+    let mut env = passed_env.clone();
+    let mut expression = passed_expression.clone();
 
-            let first = expression.as_list().unwrap().first().unwrap();
+    loop {
+        match expression {
+            LispyType::List { .. } => {
+                if expression.as_list().unwrap().is_empty() {
+                    return Ok(expression.clone());
+                }
 
-            if first.is_symbol() {
-                match first.as_symbol().unwrap().as_str() {
-                    "def!" => {
-                        let key = expression.as_list().unwrap().get(1).unwrap().clone();
-                        let value = expression.as_list().unwrap().get(2).unwrap().clone();
+                let first = expression.as_list().unwrap().first().unwrap();
 
-                        if !key.is_symbol() {
-                            return Err(LispyType::Error {
-                                message: format!("def! first arg must be a symbol. Received: {}", key),
-                                error_type: "INCORRECT_TYPE".to_string(),
-                                meta: HashMap::new(),
-                            });
-                        }
+                if first.is_symbol() {
+                    match first.as_symbol().unwrap().as_str() {
+                        "def!" => {
+                            let key = expression.as_list().unwrap().get(1).unwrap().clone();
+                            let value = expression.as_list().unwrap().get(2).unwrap().clone();
 
-                        let evaluated = eval(&value, env);
-                        if evaluated.is_err() { return evaluated; }
-
-                        env.set_item(key.as_symbol().unwrap().clone(), evaluated.as_ref().unwrap().clone());
-                        return evaluated;
-                    }
-                    "let*" => {
-                        let mut n_env = LispyEnv::child(env);
-                        let bindings = expression.as_list().unwrap().get(1).unwrap().clone();
-                        let to_eval = expression.as_list().unwrap().get(2).unwrap().clone();
-
-                        if !bindings.is_list() || bindings.as_list().unwrap().len() % 2 != 0 {
-                            return Err(LispyType::Error {
-                                message: format!("let* first arg must be a list of key value pairs. Received: {}", bindings),
-                                error_type: "INCORRECT_TYPE".to_string(),
-                                meta: HashMap::new(),
-                            });
-                        }
-
-                        for index in (0..bindings.as_list().unwrap().len()).step_by(2) {
-                            let key = bindings.as_list().unwrap().get(index).unwrap().clone();
-                            let value = bindings.as_list().unwrap().get(index + 1).unwrap().clone();
                             if !key.is_symbol() {
                                 return Err(LispyType::Error {
-                                    message: format!("let* bindings key must be a symbol. Received: {}", bindings),
+                                    message: format!("def! first arg must be a symbol. Received: {}", key),
                                     error_type: "INCORRECT_TYPE".to_string(),
                                     meta: HashMap::new(),
                                 });
                             }
-                            let evaluated = eval(&value, &mut n_env);
-                            if evaluated.is_err() {
-                                return evaluated;
-                            }
-                            n_env.set_item(key.as_symbol().unwrap().clone(), evaluated.unwrap());
-                        }
 
-                        return eval(&to_eval, &mut n_env);
-                    }
-                    "do" => {
-                        for index in 1..expression.as_list().unwrap().len() {
-                            let item = expression.as_list().unwrap().get(index).unwrap().clone();
-                            let evaluated = eval(&item, env);
-                            if evaluated.is_err() || index == expression.as_list().unwrap().len() - 1 {
-                                return evaluated;
-                            }
-                        }
-                    }
-                    "if" => {
-                        let cond = expression.as_list().unwrap().get(1).unwrap().clone();
-                        let evaluated_condition = eval(&cond, env);
-                        let to_eval = if evaluated_condition.unwrap().is_truthy() {
-                            expression.as_list().unwrap().get(2).unwrap().clone()
-                        } else {
-                            expression.as_list().unwrap().get(3).unwrap().clone()
-                        };
+                            let evaluated = eval(&value, &mut env);
+                            if evaluated.is_err() { return evaluated; }
 
-                        return eval(&to_eval, env);
+                            env.set_item(key.as_symbol().unwrap().clone(), evaluated.as_ref().unwrap().clone());
+                            passed_env.modify_with(&env);
+                            return evaluated;
+                        }
+                        "let*" => {
+                            let mut n_env = LispyEnv::child(&mut env);
+                            let bindings = expression.as_list().unwrap().get(1).unwrap().clone();
+                            let to_eval = expression.as_list().unwrap().get(2).unwrap().clone();
+
+                            if !bindings.is_list() || bindings.as_list().unwrap().len() % 2 != 0 {
+                                return Err(LispyType::Error {
+                                    message: format!("let* first arg must be a list of key value pairs. Received: {}", bindings),
+                                    error_type: "INCORRECT_TYPE".to_string(),
+                                    meta: HashMap::new(),
+                                });
+                            }
+
+                            for index in (0..bindings.as_list().unwrap().len()).step_by(2) {
+                                let key = bindings.as_list().unwrap().get(index).unwrap().clone();
+                                let value = bindings.as_list().unwrap().get(index + 1).unwrap().clone();
+                                if !key.is_symbol() {
+                                    return Err(LispyType::Error {
+                                        message: format!("let* bindings key must be a symbol. Received: {}", bindings),
+                                        error_type: "INCORRECT_TYPE".to_string(),
+                                        meta: HashMap::new(),
+                                    });
+                                }
+                                let evaluated = eval(&value, &mut n_env);
+                                if evaluated.is_err() {
+                                    return evaluated;
+                                }
+                                n_env.set_item(key.as_symbol().unwrap().clone(), evaluated.unwrap());
+                            }
+
+                            env = n_env;
+                            expression = to_eval;
+                            continue;
+                        }
+                        "do" => {
+                            for index in 1..expression.as_list().unwrap().len() - 1 {
+                                let item = expression.as_list().unwrap().get(index).unwrap().clone();
+                                let evaluated = eval(&item, &mut env);
+                                if evaluated.is_err() {
+                                    return evaluated;
+                                }
+                            }
+                            let last_expr = expression.as_list().unwrap().get(expression.as_list().unwrap().len() - 1).unwrap().clone();
+                            expression = last_expr;
+                            continue;
+                        }
+                        "if" => {
+                            let cond = expression.as_list().unwrap().get(1).unwrap().clone();
+                            let evaluated_condition = eval(&cond, &mut env);
+                            let to_eval = if evaluated_condition.unwrap().is_truthy() {
+                                expression.as_list().unwrap().get(2).unwrap().clone()
+                            } else {
+                                expression.as_list().unwrap().get(3).unwrap().clone()
+                            };
+
+                            expression = to_eval;
+                            continue;
+                        }
+                        "fn*" => {
+                            let bindings = expression.as_list().unwrap().get(1).unwrap().clone().as_list().unwrap().clone();
+                            let to_eval = expression.as_list().unwrap().get(2).unwrap().clone();
+                            return Ok(LispyType::Lambda {
+                                bindings,
+                                to_eval: Box::new(to_eval),
+                                env: Box::new(env.clone()),
+                                meta: HashMap::new(),
+                            });
+                        }
+                        "eval" => {
+                            let unevaluated_expr = expression.as_list().unwrap().get(1).unwrap().clone();
+                            let evaluated_expr = eval(&unevaluated_expr, &mut env);
+                            if evaluated_expr.is_err() {
+                                return evaluated_expr;
+                            }
+                            expression = evaluated_expr.unwrap();
+                            continue;
+                        }
+                        _ => {}
                     }
-                    "fn*" => {
-                        let bindings = expression.as_list().unwrap().get(1).unwrap().clone().as_list().unwrap().clone();
-                        let to_eval = expression.as_list().unwrap().get(2).unwrap().clone();
-                        return Ok(LispyType::Lambda {
-                            bindings,
-                            to_eval: Box::new(to_eval),
-                            env: Box::new(env.clone()),
-                            meta: HashMap::new(),
-                        });
-                    }
-                    _ => {}
                 }
-            }
-            let evaluated = eval_ast(expression, env);
-            if evaluated.is_err() {
-                return evaluated;
-            }
-            let callee = evaluated.as_ref().unwrap().as_list().unwrap().get(0).unwrap().clone();
-            let len = evaluated.as_ref().unwrap().as_list().unwrap().len();
-            let arguments: Vec<LispyType> = evaluated.as_ref().unwrap().as_list().unwrap().get(1..len).unwrap().into();
+                let evaluated = eval_ast(&expression, &mut env);
+                if evaluated.is_err() {
+                    return evaluated;
+                }
+                let callee = evaluated.as_ref().unwrap().as_list().unwrap().get(0).unwrap().clone();
+                let len = evaluated.as_ref().unwrap().as_list().unwrap().len();
+                let arguments: Vec<LispyType> = evaluated.as_ref().unwrap().as_list().unwrap().get(1..len).unwrap().into();
 
-            callee.apply_function(arguments)
+                if callee.is_function() && !callee.is_lambda() {
+                    return callee.apply_function(arguments);
+                }
+
+                let parse = callee.apply_lambda(arguments);
+                if parse.is_err() {
+                    return Err(parse.err().unwrap());
+                }
+                let unwrapped = parse.unwrap();
+                expression = unwrapped.0;
+                env = unwrapped.1;
+                continue;
+            }
+            _ => return eval_ast(&expression, &mut env)
         }
-        _ => eval_ast(expression, env)
     }
 }
 
@@ -179,7 +211,7 @@ impl LispyMachine {
             env: LispyEnv::root()
         };
 
-        this.evaluate_file("core.lispy");
+        this.evaluate_file("lispy_std/core.lispy");
 
         this
     }

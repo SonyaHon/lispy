@@ -44,7 +44,7 @@ fn build_any_form(reader: &mut TokenReader) -> LispyType {
         }
         LexerToken::String(val) => {
             reader.grab();
-            LispyType::String { value: val.clone(), meta: HashMap::new() }
+            LispyType::String { value: val.clone()[1..val.len() - 1].to_string().clone(), meta: HashMap::new() }
         }
         LexerToken::Number(val) => {
             reader.grab();

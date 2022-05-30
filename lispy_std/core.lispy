@@ -3,3 +3,7 @@
 
 (def! not (fn* (condition)
     (if condition false true)))
+
+(def! load-file (fn* (file-path)
+    (eval
+        (compile-string (slurp file-path)))))

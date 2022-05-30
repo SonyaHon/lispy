@@ -119,6 +119,13 @@ impl LispyType {
             _ => false
         }
     }
+
+    pub fn is_lambda(&self) -> bool {
+        match self {
+            LispyType::Lambda { .. } => true,
+            _ => false
+        }
+    }
 }
 
 // as_? impls
@@ -194,7 +201,17 @@ impl LispyType {
                 }
                 (func)(args)
             }
-            LispyType::Lambda { bindings, to_eval, env, .. } => {
+            _ => Err(LispyType::Error {
+                message: format!("{:?} is not a function", self).to_string(),
+                error_type: "NOT_A_FUNCTION".to_string(),
+                meta: HashMap::new(),
+            })
+        }
+    }
+
+    pub fn apply_lambda(&self, args: Vec<LispyType>) -> Result<(LispyType, LispyEnv), LispyType> {
+        match self {
+            LispyType::Lambda { env, to_eval, bindings, .. } => {
                 let mut n_env = LispyEnv::child_lambda(env.clone());
                 if bindings.len() != args.len() {
                     return Err(LispyType::Error {
@@ -217,7 +234,7 @@ impl LispyType {
                     n_env.set_item(key.as_symbol().unwrap().clone(), value);
                 }
 
-                eval(to_eval, &mut n_env)
+                Ok((*to_eval.clone(), n_env))
             }
             _ => Err(LispyType::Error {
                 message: format!("{:?} is not a function", self).to_string(),
@@ -227,6 +244,7 @@ impl LispyType {
         }
     }
 }
+
 
 // truthiness
 impl LispyType {
@@ -302,6 +320,13 @@ impl LispyType {
             meta: HashMap::new(),
         }
     }
+
+    pub fn create_string(value: &str) -> Self {
+        Self::String {
+            value: value.to_string(),
+            meta: HashMap::new(),
+        }
+    }
 }
 
 impl Display for LispyType {
@@ -317,10 +342,10 @@ impl Display for LispyType {
                 write!(f, "{}", value)
             }
             LispyType::Symbol { value, .. } => {
-                write!(f, "{}", value)
+                write!(f, "Symbol<{}>", value)
             }
             LispyType::Keyword { value, .. } => {
-                write!(f, "{}", value)
+                write!(f, "Keyword<{}>", value)
             }
             LispyType::String { value, .. } => {
                 write!(f, "{}", value)

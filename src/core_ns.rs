@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+use std::fs;
+use crate::compile_source_code_to_ast;
 use crate::env::LispyEnv;
+use crate::machine::eval;
 use crate::types::LispyType;
 
 pub fn apply_core_ns(env: &mut LispyEnv) {
@@ -178,5 +181,40 @@ pub fn apply_core_ns(env: &mut LispyEnv) {
             )
         },
     ));
+    //#endregion
+    //#region Eval
+    env.set("compile-string", LispyType::create_function(
+        Some(1),
+        |args| {
+            let ast = compile_source_code_to_ast(args[0].clone().as_string().unwrap().as_str());
+            let start = vec![
+                LispyType::Symbol { value: "do".to_string(), meta: HashMap::new() },
+            ];
+
+            let collection = vec![start, ast].concat();
+            Ok(LispyType::List {
+                collection: Box::from(
+                    collection,
+                ),
+                meta: HashMap::new(),
+            })
+        },
+    ));
+    //#endregion
+    //#region FS
+    env.set("slurp", LispyType::create_function(
+        Some(1),
+        |args| {
+            let path = args[0].as_string().unwrap();
+            let contents = fs::read_to_string(path);
+            if contents.is_err() {
+                return Err(LispyType::create_error(
+                    format!("File {} not found", path).as_str(),
+                    "SYSTEM_ERROR",
+                ));
+            }
+            Ok(LispyType::create_string(contents.unwrap().as_str()))
+        },
+    ))
     //#endregion
 }

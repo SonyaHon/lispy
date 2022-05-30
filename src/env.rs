@@ -47,4 +47,8 @@ impl LispyEnv {
     pub fn set(&mut self, key: &str, value: LispyType) {
         self.store.insert(key.to_string(), value);
     }
+
+    pub fn modify_with(&mut self, from: &LispyEnv) {
+        self.store = from.store.clone();
+    }
 }
