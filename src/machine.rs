@@ -134,6 +134,14 @@ pub fn eval(passed_expression: &LispyType, passed_env: &mut LispyEnv) -> Result<
                             continue;
                         }
                         "do" => {
+                            if expression.as_list().unwrap().len() == 1 {
+                                return Ok(LispyType::create_nil());
+                            }
+                            if expression.as_list().unwrap().len() == 2 {
+                                let last_expr = expression.as_list().unwrap().get(expression.as_list().unwrap().len() - 1).unwrap().clone();
+                                expression = last_expr;
+                                continue;
+                            }
                             for index in 1..expression.as_list().unwrap().len() - 1 {
                                 let item = expression.as_list().unwrap().get(index).unwrap().clone();
                                 let evaluated = eval(&item, &mut env);
