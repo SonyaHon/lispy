@@ -491,6 +491,14 @@ impl LispyMachine {
         this
     }
 
+    pub fn get_env_mut(&mut self) -> &mut LispyEnv {
+        &mut self.env
+    }
+
+    pub fn get_env(&self) -> &LispyEnv {
+        &self.env
+    }
+
     pub fn execute(&mut self, input_code: &str) {
         let ast = compile_source_code_to_ast(input_code);
 
