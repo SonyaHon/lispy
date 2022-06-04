@@ -12,3 +12,6 @@
     `(def! ~name (fn* ~bindings
         (do
         ~body)))))
+
+(defmacro! when (condition body)
+    `(if ~condition ~body nil))
