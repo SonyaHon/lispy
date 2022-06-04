@@ -33,6 +33,42 @@ impl TokenReader {
 
 fn build_any_form(reader: &mut TokenReader) -> LispyType {
     match reader.peek() {
+        LexerToken::Quote => {
+            reader.grab();
+            LispyType::create_list(
+                vec![
+                    LispyType::create_symbol("quote"),
+                    build_any_form(reader),
+                ]
+            )
+        }
+        LexerToken::QuasiQuote => {
+            reader.grab();
+            LispyType::create_list(
+                vec![
+                    LispyType::create_symbol("quasi-quote"),
+                    build_any_form(reader),
+                ]
+            )
+        }
+        LexerToken::Unquote => {
+            reader.grab();
+            LispyType::create_list(
+                vec![
+                    LispyType::create_symbol("unquote"),
+                    build_any_form(reader),
+                ]
+            )
+        }
+        LexerToken::SpliceUnquote => {
+            reader.grab();
+            LispyType::create_list(
+                vec![
+                    LispyType::create_symbol("splice-unquote"),
+                    build_any_form(reader),
+                ]
+            )
+        }
         LexerToken::Nil => {
             reader.grab();
             LispyType::Nil { meta: HashMap::new() }

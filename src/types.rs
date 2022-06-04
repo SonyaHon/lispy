@@ -1,11 +1,10 @@
+use crate::env::LispyEnv;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Add, Div, Mul, Sub};
-use crate::env::LispyEnv;
-use crate::machine::eval;
 
 fn integer_decode(val: f64) -> (u64, i16, i8) {
     let bits: u64 = unsafe { mem::transmute(val) };
@@ -25,21 +24,58 @@ pub type TypeMeta = HashMap<String, LispyType>;
 
 #[derive(Debug, Clone)]
 pub enum LispyType {
-    Nil { meta: TypeMeta },
+    Nil {
+        meta: TypeMeta,
+    },
 
-    Bool { value: bool, meta: TypeMeta },
-    Number { value: f64, meta: TypeMeta },
-    Symbol { value: String, meta: TypeMeta },
-    Keyword { value: String, meta: TypeMeta },
-    String { value: String, meta: TypeMeta },
+    Bool {
+        value: bool,
+        meta: TypeMeta,
+    },
+    Number {
+        value: f64,
+        meta: TypeMeta,
+    },
+    Symbol {
+        value: String,
+        meta: TypeMeta,
+    },
+    Keyword {
+        value: String,
+        meta: TypeMeta,
+    },
+    String {
+        value: String,
+        meta: TypeMeta,
+    },
 
-    List { collection: Box<Vec<LispyType>>, meta: TypeMeta },
-    Hash { collection: Box<HashMap<LispyType, LispyType>>, meta: TypeMeta },
+    List {
+        collection: Box<Vec<LispyType>>,
+        meta: TypeMeta,
+    },
+    Hash {
+        collection: Box<HashMap<LispyType, LispyType>>,
+        meta: TypeMeta,
+    },
 
-    Error { error_type: String, message: String, meta: TypeMeta },
+    Error {
+        error_type: String,
+        message: String,
+        meta: TypeMeta,
+    },
 
-    Function { arity: Option<i32>, func: fn(args: Vec<LispyType>) -> Result<LispyType, LispyType>, meta: TypeMeta },
-    Lambda { bindings: Box<Vec<LispyType>>, to_eval: Box<LispyType>, env: Box<LispyEnv>, meta: TypeMeta },
+    Function {
+        arity: Option<i32>,
+        func: fn(args: Vec<LispyType>) -> Result<LispyType, LispyType>,
+        meta: TypeMeta,
+    },
+    Lambda {
+        bindings: Box<Vec<LispyType>>,
+        to_eval: Box<LispyType>,
+        env: Box<LispyEnv>,
+        meta: TypeMeta,
+        is_macro: bool,
+    },
 }
 
 pub struct LispyErrorInternal {
@@ -52,63 +88,70 @@ impl LispyType {
     pub fn is_nil(&self) -> bool {
         match self {
             LispyType::Nil { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_bool(&self) -> bool {
         match self {
             LispyType::Bool { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_number(&self) -> bool {
         match self {
             LispyType::Number { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_symbol(&self) -> bool {
         match self {
             LispyType::Symbol { .. } => true,
-            _ => false
+            _ => false,
+        }
+    }
+
+    pub fn is_symbol_containing(&self, test: &str) -> bool {
+        match self {
+            LispyType::Symbol { value, .. } => value == test,
+            _ => false,
         }
     }
 
     pub fn is_keyword(&self) -> bool {
         match self {
             LispyType::Keyword { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_string(&self) -> bool {
         match self {
             LispyType::String { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_list(&self) -> bool {
         match self {
             LispyType::List { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_hash(&self) -> bool {
         match self {
             LispyType::Hash { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_error(&self) -> bool {
         match self {
             LispyType::Error { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -116,14 +159,21 @@ impl LispyType {
         match self {
             LispyType::Function { .. } => true,
             LispyType::Lambda { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_lambda(&self) -> bool {
         match self {
             LispyType::Lambda { .. } => true,
-            _ => false
+            _ => false,
+        }
+    }
+
+    pub fn is_macro(&self) -> bool {
+        match self {
+            LispyType::Lambda { is_macro, .. } => is_macro.clone(),
+            _ => false,
         }
     }
 }
@@ -133,56 +183,63 @@ impl LispyType {
     pub fn as_bool(&self) -> Option<&bool> {
         match self {
             LispyType::Bool { value, .. } => Some(value),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_number(&self) -> Option<&f64> {
         match self {
             LispyType::Number { value, .. } => Some(value),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_symbol(&self) -> Option<&String> {
         match self {
             LispyType::Symbol { value, .. } => Some(value),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_keyword(&self) -> Option<&String> {
         match self {
             LispyType::Keyword { value, .. } => Some(value),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_string(&self) -> Option<&String> {
         match self {
             LispyType::String { value, .. } => Some(value),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_list(&self) -> Option<&Box<Vec<LispyType>>> {
         match self {
             LispyType::List { collection, .. } => Some(collection),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_hash(&self) -> Option<&Box<HashMap<LispyType, LispyType>>> {
         match self {
             LispyType::Hash { collection, .. } => Some(collection),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_error(&self) -> Option<LispyErrorInternal> {
         match self {
-            LispyType::Error { message, error_type, .. } => Some(LispyErrorInternal { message: message.clone(), error_type: error_type.clone() }),
-            _ => None
+            LispyType::Error {
+                message,
+                error_type,
+                ..
+            } => Some(LispyErrorInternal {
+                message: message.clone(),
+                error_type: error_type.clone(),
+            }),
+            _ => None,
         }
     }
 }
@@ -194,7 +251,11 @@ impl LispyType {
             LispyType::Function { func, arity, .. } => {
                 if arity.is_some() && arity.unwrap() as usize != args.len() {
                     return Err(LispyType::Error {
-                        message: format!("Expected arity {}, received {}", arity.unwrap(), args.len()),
+                        message: format!(
+                            "Expected arity {}, received {}",
+                            arity.unwrap(),
+                            args.len()
+                        ),
                         error_type: "INCORRECT_ARITY".to_string(),
                         meta: HashMap::new(),
                     });
@@ -205,17 +266,26 @@ impl LispyType {
                 message: format!("{:?} is not a function", self).to_string(),
                 error_type: "NOT_A_FUNCTION".to_string(),
                 meta: HashMap::new(),
-            })
+            }),
         }
     }
 
     pub fn apply_lambda(&self, args: Vec<LispyType>) -> Result<(LispyType, LispyEnv), LispyType> {
         match self {
-            LispyType::Lambda { env, to_eval, bindings, .. } => {
+            LispyType::Lambda {
+                env,
+                to_eval,
+                bindings,
+                ..
+            } => {
                 let mut n_env = LispyEnv::child_lambda(env.clone());
                 if bindings.len() != args.len() {
                     return Err(LispyType::Error {
-                        message: format!("Expected arity {}, received {}", bindings.len(), args.len()),
+                        message: format!(
+                            "Expected arity {}, received {}",
+                            bindings.len(),
+                            args.len()
+                        ),
                         error_type: "INCORRECT_ARITY".to_string(),
                         meta: HashMap::new(),
                     });
@@ -226,7 +296,10 @@ impl LispyType {
                     let value = args.get(i).unwrap().clone();
                     if !key.is_symbol() {
                         return Err(LispyType::Error {
-                            message: format!("Bindings should consist of symbols. Received {}", key),
+                            message: format!(
+                                "Bindings should consist of symbols. Received {}",
+                                key
+                            ),
                             error_type: "INCORRECT_TYPE".to_string(),
                             meta: HashMap::new(),
                         });
@@ -240,11 +313,33 @@ impl LispyType {
                 message: format!("{:?} is not a function", self).to_string(),
                 error_type: "NOT_A_FUNCTION".to_string(),
                 meta: HashMap::new(),
-            })
+            }),
+        }
+    }
+
+    pub fn convert_to_macro(&self) -> LispyType {
+        match self {
+            LispyType::Lambda {
+                env,
+                to_eval,
+                bindings,
+                meta,
+                ..
+            } => LispyType::Lambda {
+                bindings: bindings.clone(),
+                to_eval: to_eval.clone(),
+                env: env.clone(),
+                meta: meta.clone(),
+                is_macro: true,
+            },
+            _ => LispyType::Error {
+                message: format!("{:?} is not a lambda", self).to_string(),
+                error_type: "NOT_A_FUNCTION".to_string(),
+                meta: HashMap::new(),
+            },
         }
     }
 }
-
 
 // truthiness
 impl LispyType {
@@ -264,28 +359,41 @@ impl LispyType {
         match self {
             LispyType::String { value, .. } => {
                 let value = value.len() as f64;
-                LispyType::Number { value, meta: HashMap::new() }
+                LispyType::Number {
+                    value,
+                    meta: HashMap::new(),
+                }
             }
             LispyType::List { collection, .. } => {
                 let value = collection.len() as f64;
-                LispyType::Number { value, meta: HashMap::new() }
+                LispyType::Number {
+                    value,
+                    meta: HashMap::new(),
+                }
             }
             LispyType::Hash { collection, .. } => {
                 let value = collection.len() as f64;
-                LispyType::Number { value, meta: HashMap::new() }
+                LispyType::Number {
+                    value,
+                    meta: HashMap::new(),
+                }
             }
             _ => LispyType::Error {
                 message: format!("{} does not have length", self),
                 error_type: "INCORRECT_TYPE".to_string(),
                 meta: HashMap::new(),
-            }
+            },
         }
     }
 }
 
 // constructors
+#[allow(dead_code)]
 impl LispyType {
-    pub fn create_function(arity: Option<i32>, func: fn(args: Vec<LispyType>) -> Result<LispyType, LispyType>) -> Self {
+    pub fn create_function(
+        arity: Option<i32>,
+        func: fn(args: Vec<LispyType>) -> Result<LispyType, LispyType>,
+    ) -> Self {
         Self::Function {
             arity,
             func,
@@ -309,7 +417,7 @@ impl LispyType {
 
     pub fn create_nil() -> Self {
         Self::Nil {
-            meta: HashMap::new()
+            meta: HashMap::new(),
         }
     }
 
@@ -325,6 +433,95 @@ impl LispyType {
         Self::String {
             value: value.to_string(),
             meta: HashMap::new(),
+        }
+    }
+
+    pub fn create_symbol(value: &str) -> Self {
+        Self::Symbol {
+            value: value.to_string(),
+            meta: HashMap::new(),
+        }
+    }
+
+    pub fn create_list(collection: Vec<LispyType>) -> Self {
+        Self::List {
+            collection: Box::from(collection),
+            meta: HashMap::new(),
+        }
+    }
+}
+
+// iteration
+impl LispyType {
+    pub fn first(&self) -> Result<LispyType, LispyType> {
+        match self {
+            LispyType::String { value, .. } => {
+                let x = value.get(0..1);
+                if x.is_some() {
+                    return Ok(LispyType::create_string(x.unwrap()));
+                }
+                Ok(LispyType::create_nil())
+            }
+            LispyType::List { collection, .. } => {
+                let x = collection.first();
+                if x.is_some() {
+                    return Ok(x.unwrap().clone());
+                }
+                Ok(LispyType::create_nil())
+            }
+            _ => Err(LispyType::create_error(
+                format!("{} is not iterable", self).as_str(),
+                "INVALID_TYPE",
+            )),
+        }
+    }
+
+    pub fn rest(&self) -> Result<LispyType, LispyType> {
+        match self {
+            LispyType::String { value, .. } => {
+                let x = value.get(1..value.len());
+                if x.is_some() {
+                    return Ok(LispyType::create_string(x.unwrap()));
+                }
+                Ok(LispyType::create_nil())
+            }
+            LispyType::List { collection, .. } => {
+                let x = collection.get(1..collection.len());
+
+                if x.is_some() {
+                    return Ok(LispyType::create_list(Vec::from_iter(
+                        x.unwrap().iter().map(|item| item.clone()),
+                    )));
+                }
+                Ok(LispyType::create_nil())
+            }
+            _ => Err(LispyType::create_error(
+                format!("{} is not iterable", self).as_str(),
+                "INVALID_TYPE",
+            )),
+        }
+    }
+
+    pub fn nth(&self, index: usize) -> Result<LispyType, LispyType> {
+        match self {
+            LispyType::String { value, .. } => {
+                let x = value.get(index..index + 1);
+                if x.is_some() {
+                    return Ok(LispyType::create_string(x.unwrap()));
+                }
+                Ok(LispyType::create_nil())
+            }
+            LispyType::List { collection, .. } => {
+                let x = collection.get(index);
+                if x.is_some() {
+                    return Ok(x.unwrap().clone());
+                }
+                Ok(LispyType::create_nil())
+            }
+            _ => Err(LispyType::create_error(
+                format!("{} is not iterable", self).as_str(),
+                "INVALID_TYPE",
+            )),
         }
     }
 }
@@ -352,10 +549,11 @@ impl Display for LispyType {
             }
             LispyType::List { collection, .. } => {
                 let mut str = "".to_string();
-                // collection.iter().for_each(|item| { str += &format!("{}", item).to_string() });
-                str += &format!("{}", collection.first().unwrap()).to_string();
-                for index in 1..collection.len() {
-                    str += &format!(", {}", collection.get(index).unwrap());
+                if collection.len() > 0 {
+                    str += &format!("{}", collection.first().unwrap()).to_string();
+                    for index in 1..collection.len() {
+                        str += &format!(", {}", collection.get(index).unwrap());
+                    }
                 }
                 write!(f, "[{}]", str)
             }
@@ -387,24 +585,20 @@ impl PartialEq for LispyType {
     fn eq(&self, other: &Self) -> bool {
         match self {
             LispyType::Nil { .. } => other.is_nil(),
-            LispyType::Bool { .. } => {
-                other.is_bool() && self.as_bool() == other.as_bool()
-            }
-            LispyType::Number { .. } => {
-                other.is_number() && self.as_number() == other.as_number()
-            }
-            LispyType::Symbol { .. } => {
-                other.is_symbol() && self.as_symbol() == other.as_symbol()
-            }
+            LispyType::Bool { .. } => other.is_bool() && self.as_bool() == other.as_bool(),
+            LispyType::Number { .. } => other.is_number() && self.as_number() == other.as_number(),
+            LispyType::Symbol { .. } => other.is_symbol() && self.as_symbol() == other.as_symbol(),
             LispyType::Keyword { .. } => {
                 other.is_keyword() && self.as_keyword() == other.as_keyword()
             }
-            LispyType::String { .. } => {
-                other.is_string() && self.as_string() == other.as_string()
-            }
+            LispyType::String { .. } => other.is_string() && self.as_string() == other.as_string(),
             LispyType::List { .. } => {
-                if !other.is_list() { return false; }
-                if other.as_list().unwrap().len() != self.as_list().unwrap().len() { return false; }
+                if !other.is_list() {
+                    return false;
+                }
+                if other.as_list().unwrap().len() != self.as_list().unwrap().len() {
+                    return false;
+                }
 
                 for index in 0..self.as_list().unwrap().len() - 1 {
                     if self.as_list().unwrap().get(index) != other.as_list().unwrap().get(index) {
@@ -415,11 +609,17 @@ impl PartialEq for LispyType {
                 true
             }
             LispyType::Hash { .. } => {
-                if !other.is_hash() { return false; }
-                if other.as_hash().unwrap().len() != self.as_hash().unwrap().len() { return false; }
+                if !other.is_hash() {
+                    return false;
+                }
+                if other.as_hash().unwrap().len() != self.as_hash().unwrap().len() {
+                    return false;
+                }
 
                 for key in self.as_hash().as_ref().unwrap().keys() {
-                    if self.as_hash().as_ref().unwrap().get(key) != other.as_hash().as_ref().unwrap().get(key) {
+                    if self.as_hash().as_ref().unwrap().get(key)
+                        != other.as_hash().as_ref().unwrap().get(key)
+                    {
                         return false;
                     }
                 }
@@ -427,7 +627,8 @@ impl PartialEq for LispyType {
                 true
             }
             LispyType::Error { .. } => {
-                other.is_error() && self.as_error().unwrap().error_type == other.as_error().unwrap().error_type
+                other.is_error()
+                    && self.as_error().unwrap().error_type == other.as_error().unwrap().error_type
             }
             LispyType::Function { .. } => false,
             LispyType::Lambda { .. } => false,
@@ -459,11 +660,22 @@ impl Add for LispyType {
             LispyType::Number { value: a, .. } => {
                 if rhs.is_number() {
                     let res = a + rhs.as_number().unwrap();
-                    return LispyType::Number { value: res, meta: HashMap::new() };
+                    return LispyType::Number {
+                        value: res,
+                        meta: HashMap::new(),
+                    };
                 }
-                LispyType::Error { message: "+ only works with number vars".to_string(), error_type: "INCORRECT_TYPE".to_string(), meta: HashMap::new() }
+                LispyType::Error {
+                    message: "+ only works with number vars".to_string(),
+                    error_type: "INCORRECT_TYPE".to_string(),
+                    meta: HashMap::new(),
+                }
             }
-            _ => LispyType::Error { message: "+ only works with number vars".to_string(), error_type: "INCORRECT_TYPE".to_string(), meta: HashMap::new() }
+            _ => LispyType::Error {
+                message: "+ only works with number vars".to_string(),
+                error_type: "INCORRECT_TYPE".to_string(),
+                meta: HashMap::new(),
+            },
         }
     }
 }
@@ -476,11 +688,22 @@ impl Sub for LispyType {
             LispyType::Number { value: a, .. } => {
                 if rhs.is_number() {
                     let res = a - rhs.as_number().unwrap();
-                    return LispyType::Number { value: res, meta: HashMap::new() };
+                    return LispyType::Number {
+                        value: res,
+                        meta: HashMap::new(),
+                    };
                 }
-                LispyType::Error { message: "+ only works with number vars".to_string(), error_type: "INCORRECT_TYPE".to_string(), meta: HashMap::new() }
+                LispyType::Error {
+                    message: "+ only works with number vars".to_string(),
+                    error_type: "INCORRECT_TYPE".to_string(),
+                    meta: HashMap::new(),
+                }
             }
-            _ => LispyType::Error { message: "+ only works with number vars".to_string(), error_type: "INCORRECT_TYPE".to_string(), meta: HashMap::new() }
+            _ => LispyType::Error {
+                message: "+ only works with number vars".to_string(),
+                error_type: "INCORRECT_TYPE".to_string(),
+                meta: HashMap::new(),
+            },
         }
     }
 }
@@ -493,11 +716,22 @@ impl Mul for LispyType {
             LispyType::Number { value: a, .. } => {
                 if rhs.is_number() {
                     let res = a * rhs.as_number().unwrap();
-                    return LispyType::Number { value: res, meta: HashMap::new() };
+                    return LispyType::Number {
+                        value: res,
+                        meta: HashMap::new(),
+                    };
                 }
-                LispyType::Error { message: "+ only works with number vars".to_string(), error_type: "INCORRECT_TYPE".to_string(), meta: HashMap::new() }
+                LispyType::Error {
+                    message: "+ only works with number vars".to_string(),
+                    error_type: "INCORRECT_TYPE".to_string(),
+                    meta: HashMap::new(),
+                }
             }
-            _ => LispyType::Error { message: "+ only works with number vars".to_string(), error_type: "INCORRECT_TYPE".to_string(), meta: HashMap::new() }
+            _ => LispyType::Error {
+                message: "+ only works with number vars".to_string(),
+                error_type: "INCORRECT_TYPE".to_string(),
+                meta: HashMap::new(),
+            },
         }
     }
 }
@@ -510,11 +744,22 @@ impl Div for LispyType {
             LispyType::Number { value: a, .. } => {
                 if rhs.is_number() {
                     let res = a / rhs.as_number().unwrap();
-                    return LispyType::Number { value: res, meta: HashMap::new() };
+                    return LispyType::Number {
+                        value: res,
+                        meta: HashMap::new(),
+                    };
                 }
-                LispyType::Error { message: "+ only works with number vars".to_string(), error_type: "INCORRECT_TYPE".to_string(), meta: HashMap::new() }
+                LispyType::Error {
+                    message: "+ only works with number vars".to_string(),
+                    error_type: "INCORRECT_TYPE".to_string(),
+                    meta: HashMap::new(),
+                }
             }
-            _ => LispyType::Error { message: "+ only works with number vars".to_string(), error_type: "INCORRECT_TYPE".to_string(), meta: HashMap::new() }
+            _ => LispyType::Error {
+                message: "+ only works with number vars".to_string(),
+                error_type: "INCORRECT_TYPE".to_string(),
+                meta: HashMap::new(),
+            },
         }
     }
 }
@@ -522,9 +767,10 @@ impl Div for LispyType {
 impl PartialOrd for LispyType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match self {
-            LispyType::Number { .. } => {
-                self.as_number().unwrap().partial_cmp(other.as_number().unwrap())
-            }
+            LispyType::Number { .. } => self
+                .as_number()
+                .unwrap()
+                .partial_cmp(other.as_number().unwrap()),
             _ => None,
         }
     }

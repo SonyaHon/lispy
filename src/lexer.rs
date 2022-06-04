@@ -1,6 +1,5 @@
 use logos::Logos;
 
-
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum LexerToken {
     #[token("(")]
@@ -21,6 +20,21 @@ pub enum LexerToken {
     #[token("nil")]
     Nil,
 
+    #[token("'")]
+    Quote,
+
+    #[token("`")]
+    QuasiQuote,
+
+    #[token("~")]
+    Unquote,
+
+    #[token("~@")]
+    SpliceUnquote,
+
+    #[token("&")]
+    ArgsSpread,
+    
     #[regex(r#""(\\"|[^"])*""#, | lex | lex.slice().parse())]
     String(String),
 

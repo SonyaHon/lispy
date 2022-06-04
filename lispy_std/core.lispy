@@ -7,3 +7,8 @@
 (def! load-file (fn* (file-path)
     (eval
         (compile-string (slurp file-path)))))
+
+(defmacro! defun! (fn* (name, bindings, body)
+    `(def! ~name (fn* ~bindings
+        (do
+        ~body)))))
